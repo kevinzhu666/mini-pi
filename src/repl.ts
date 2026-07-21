@@ -11,6 +11,7 @@ import type { AgentEvent, AgentMessage, AssistantMessage, ToolResultMessage } fr
 import { createDefaultTools, createCodingTools } from "./tools.js";
 import { ConfigManager, BUILTIN_MODELS, findBuiltinModel } from "./config.js";
 import { registerProvider, createOpenAIProvider, createFauxProvider } from "./provider.js";
+import { MemoryManager } from "./memory.js";
 
 // ─── Colors ──────────────────────────────────────────────────────────────────
 
@@ -43,6 +44,7 @@ export class MiniPiREPL {
   private isStreaming = false;
   private currentLines: string[] = [];
   private autoRun = false;
+  private memoryManager: MemoryManager;
 
   constructor(cwd: string, config: ConfigManager, autoRun?: boolean) {
     this.cwd = cwd;
@@ -55,8 +57,12 @@ export class MiniPiREPL {
     // Create tools
     const tools = createDefaultTools({ cwd });
 
-    // Build system prompt
-    const systemPrompt = this.buildSystemPrompt();
+    // Initialize memory
+    this.memoryManager = new MemoryManager();
+    this.memoryManager.load();
+
+    // Build system prompt (with memories if any)
+    const systemPrompt = this.buildSystemPromptWithMemories();
 
     // Get model
     const model = this.resolveModel();
@@ -175,6 +181,13 @@ Guidelines:
 - Use "glob" to find files by name patterns
 - Be concise but thorough
 - Show file paths when referencing code`;
+  }
+
+  /** Build system prompt with persistent memories injected (Layer 2). */
+  private buildSystemPromptWithMemories(): string {
+    const base = this.buildSystemPrompt();
+    const memories = this.memoryManager.format();
+    return memories ? `${base}\n${memories}` : base;
   }
 
   private resolveModel() {
@@ -336,6 +349,10 @@ Guidelines:
 ║ /models          List available models        ║
 ║ /context         Show context stats           ║
 ║ /reset           Reset conversation           ║
+║ /remember k = v  Remember a fact               ║
+║ /recall <key>    Recall a fact                ║
+║ /forget <key>    Forget a fact                ║
+║ /memories [tag]  List stored memories         ║
 ╚══════════════════════════════════════════════╝
 `, "green"));
       return true;
@@ -459,6 +476,77 @@ Guidelines:
       return true;
     }
 
+    // ─── Memory Commands ────────────────────────────────────────────────
+
+    if (trimmed.startsWith("/remember ")) {
+      // Parse: /remember key = value
+      const rest = trimmed.slice(10).trim();
+      const eqIdx = rest.indexOf("=");
+      if (eqIdx === -1) {
+        process.stdout.write(colorize("Usage: /remember <key> = <value>\n", "yellow"));
+        return true;
+      }
+      const key = rest.slice(0, eqIdx).trim();
+      const value = rest.slice(eqIdx + 1).trim();
+      if (!key || !value) {
+        process.stdout.write(colorize("Usage: /remember <key> = <value>\n", "yellow"));
+        return true;
+      }
+      this.memoryManager.remember(key, value);
+      process.stdout.write(colorize(`✓ Remembered "${key}"\n`, "green"));
+      return true;
+    }
+
+    if (trimmed.startsWith("/recall ")) {
+      const key = trimmed.slice(8).trim();
+      if (!key) {
+        process.stdout.write(colorize("Usage: /recall <key>\n", "yellow"));
+        return true;
+      }
+      const entry = this.memoryManager.recall(key);
+      if (entry) {
+        const tagStr = entry.tags.length > 0 ? colorize(` (${entry.tags.join(", ")})`, "dim") : "";
+        process.stdout.write(`  ${colorize(entry.key, "green")}${tagStr}\n`);
+        process.stdout.write(`  ${entry.value}\n`);
+      } else {
+        process.stdout.write(colorize(`No memory found for "${key}"\n`, "dim"));
+      }
+      return true;
+    }
+
+    if (trimmed.startsWith("/forget ")) {
+      const key = trimmed.slice(8).trim();
+      if (!key) {
+        process.stdout.write(colorize("Usage: /forget <key>\n", "yellow"));
+        return true;
+      }
+      if (this.memoryManager.forget(key)) {
+        process.stdout.write(colorize(`✓ Forgotten "${key}"\n`, "green"));
+      } else {
+        process.stdout.write(colorize(`No memory found for "${key}"\n`, "dim"));
+      }
+      return true;
+    }
+
+    if (trimmed === "/memories" || trimmed.startsWith("/memories ")) {
+      const tag = trimmed.length > 10 ? trimmed.slice(10).trim() : undefined;
+      const entries = this.memoryManager.list(tag);
+
+      if (entries.length === 0) {
+        process.stdout.write(colorize(tag ? `No memories with tag "${tag}"\n` : "No memories yet. Use /remember to add some.\n", "dim"));
+        return true;
+      }
+
+      process.stdout.write(colorize(`\nMemories${tag ? ` (tag: ${tag})` : ""}:\n`, "bold"));
+      for (const e of entries) {
+        const tagStr = e.tags.length > 0 ? colorize(` [${e.tags.join(", ")}]`, "dim") : "";
+        process.stdout.write(`  ${colorize(e.key, "green")}${tagStr}\n`);
+        process.stdout.write(`    ${e.value}\n`);
+      }
+      process.stdout.write(colorize(`  ── ${entries.length} entries\n\n`, "dim"));
+      return true;
+    }
+
     return false; // Not a command, treat as prompt
   }
 
@@ -476,7 +564,11 @@ Guidelines:
 `, "green"));
 
     process.stdout.write(colorize(`Model: ${this.config.provider}/${this.config.modelId}\n`, "dim"));
-    process.stdout.write(colorize(`CWD: ${this.cwd}\n\n`, "dim"));
+    process.stdout.write(colorize(`CWD: ${this.cwd}\n`, "dim"));
+    if (this.memoryManager.count > 0) {
+      process.stdout.write(colorize(`Memory: ${this.memoryManager.count} facts loaded\n`, "dim"));
+    }
+    process.stdout.write("\n");
 
     // If auto-run with initial prompt
     if (this.autoRun && process.argv.slice(2).length > 0) {
@@ -526,6 +618,8 @@ Guidelines:
 
   private async sendPrompt(input: string): Promise<void> {
     try {
+      // Refresh system prompt with latest memories before each prompt
+      this.agent.systemPrompt = this.buildSystemPromptWithMemories();
       await this.agent.prompt(input);
     } catch (err) {
       if (err instanceof Error && err.message.includes("already processing")) {

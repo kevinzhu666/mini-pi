@@ -142,6 +142,16 @@ export interface StreamOptions {
 
 export type ThinkingLevel = "off" | "low" | "medium" | "high";
 
+// ─── Memory Types ─────────────────────────────────────────────────────────────
+
+export interface MemoryEntry {
+  key: string;
+  value: string;
+  tags: string[];
+  createdAt: number;
+  updatedAt: number;
+}
+
 // ─── Stream Events ───────────────────────────────────────────────────────────
 
 export type AssistantMessageEvent =

@@ -1,0 +1,11 @@
+{
+  "entries": [
+    {
+      "key": "user-profile",
+      "value": "用户的姓名是 Kevin，10 余年经验的 Java 软件工程师",
+      "tags": ["profile", "user"],
+      "createdAt": 1721558400000,
+      "updatedAt": 1721558400000
+    }
+  ]
+}

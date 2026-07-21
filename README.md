@@ -102,6 +102,10 @@ Type `/` in the REPL to use commands:
 | `/tools` | List available tools / 列出工具 |
 | `/models` | List built-in models / 列出模型 |
 | `/context` | Show context stats / 查看上下文统计 |
+| `/remember <key> = <value>` | Store a persistent fact / 永久记住一条信息 |
+| `/recall <key>` | Retrieve a stored fact / 回忆一条信息 |
+| `/forget <key>` | Delete a stored fact / 忘记一条信息 |
+| `/memories [tag]` | List all stored memories / 列出所有记忆 |
 
 ---
 
@@ -205,7 +209,68 @@ Environment variables have **higher priority** than `auth.json`, but lower than 
 
 ---
 
-## 🔌 Supported Providers & Models / 支持的服务商与模型
+## 🧠 Memory System / 记忆系统
+
+Mini Pi Agent supports a two-layer memory system for persisting facts across sessions.
+
+### Layer 1: Explicit Memory (Key-Value)
+
+Manually store and retrieve facts using REPL commands. Memories are saved to `~/.mini-pi/memory/memory.json`.
+
+```bash
+>>> /remember user-profile = Kevin，10余年经验的Java软件工程师
+✓ Remembered "user-profile"
+
+>>> /recall user-profile
+  user-profile
+  Kevin，10余年经验的Java软件工程师
+
+>>> /memories
+Memories:
+  user-profile  [Kevin，10余年经验的Java软件工程师]
+  ── 1 entries
+
+>>> /forget user-profile
+✓ Forgotten "user-profile"
+```
+
+An example file is provided at **[memory.example.json](memory.example.json)** in the project root:
+
+```bash
+cp memory.example.json ~/.mini-pi/memory/memory.json
+# Then edit the file or use /remember in REPL
+```
+
+### Layer 2: Automatic Prompt Injection
+
+Before each prompt, all stored memories are automatically injected into the system prompt. The AI sees them as context and can act on them without needing a `/recall` command.
+
+```
+System Prompt (auto-generated):
+  You are a helpful coding assistant.
+  ...
+  ## Your Memory
+  You remember these facts from past conversations:
+  [1] Kevin，10余年经验的Java软件工程师 (tags: profile, user)
+```
+
+### File Format / 文件格式
+
+```json
+{
+  "entries": [
+    {
+      "key": "unique-identifier",
+      "value": "The fact to remember",
+      "tags": ["optional", "tags"],
+      "createdAt": 1721558400000,
+      "updatedAt": 1721558400000
+    }
+  ]
+}
+```
+
+---
 
 | Provider / 服务商 | Models / 模型 |
 |-------------------|---------------|
@@ -266,6 +331,29 @@ npm run build
 # Debug mode / 调试模式
 npm run debug
 ```
+
+---
+
+## 🗺 Roadmap / 开发规划
+
+### ✅ Done / 已完成
+
+- [x] Layer 1: Explicit memory commands (`/remember`, `/recall`, `/forget`, `/memories`)
+- [x] Layer 2: Automatic memory injection into system prompt
+
+### 🚧 Planned / 规划中
+
+- [ ] **Layer 3: Session Persistence / 会话持久化**
+  - Auto-save conversation history to `~/.mini-pi/sessions/`
+  - Restore previous sessions on startup
+  - Named session snapshots (`/session save`, `/session load`)
+  - `/sessions` command to browse history
+
+- [ ] **Layer 4: Auto-Extraction / 自动事实提取**
+  - After each conversation turn, ask the LLM to extract important facts
+  - Automatically save extracted facts via `MemoryManager.remember()`
+  - Deduplicate and update existing memories
+  - Configurable extraction frequency (per-turn, per-session, manual)
 
 ---
 

@@ -1,0 +1,22 @@
+{
+  "name": "mini-pi",
+  "version": "0.1.0",
+  "description": "Mini Pi Agent - A compact coding agent inspired by Pi Agent architecture",
+  "type": "module",
+  "main": "dist/index.js",
+  "bin": {
+    "mini-pi": "dist/cli.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/cli.js",
+    "dev": "tsx src/cli.ts",
+    "debug": "tsx --inspect-brk src/cli.ts"
+  },
+  "dependencies": {},
+  "devDependencies": {
+    "typescript": "^5.9.0",
+    "tsx": "^4.19.0",
+    "@types/node": "^22.0.0"
+  }
+}

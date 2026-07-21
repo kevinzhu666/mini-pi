@@ -107,12 +107,67 @@ Type `/` in the REPL to use commands:
 
 ## ⚙️ Configuration / 配置
 
-Config files are stored in `~/.mini-pi/`:
+Config files are stored in `~/.mini-pi/`. You can use the example files in the project root as a starting point:
 
-| File / 文件 | Purpose / 用途 |
-|-------------|----------------|
-| `config.json` | General config (provider, model, etc.) / 通用配置 |
-| `auth.json` | API keys (separate for security) / API Key 安全存储 |
+```bash
+# Quick setup / 快速配置
+cp config.example.json ~/.mini-pi/config.json
+cp auth.example.json ~/.mini-pi/auth.json
+# Then edit ~/.mini-pi/auth.json to add your API keys / 然后编辑 auth.json 填入密钥
+```
+
+> **Security note**: `auth.json` is **never** committed to version control. API keys are stored separately from general config. Environment variables also work and take priority — see below.
+
+---
+
+### `~/.mini-pi/config.json` — General Config / 通用配置
+
+| Field / 字段 | Type / 类型 | Default / 默认值 | Description / 说明 |
+|-------------|------------|------------------|-------------------|
+| `provider` | `string` | `"openai"` | LLM service provider. One of: `openai`, `anthropic`, `deepseek`, `google`, `openrouter` |
+| `model` | `string` | `"gpt-4o"` | Default model ID (see Provider & Models table below for full list) |
+| `baseUrl` | `string` \| `null` | `null` | Override API base URL (e.g. for self-hosted proxy). `null` = use provider default |
+| `thinkingLevel` | `string` | `"off"` | Reasoning effort: `off`, `low`, `medium`, `high` |
+| `systemPrompt` | `string` | `"You are a helpful coding assistant."` | Custom system prompt |
+| `maxTokens` | `number` | `8192` | Max output tokens per response |
+| `toolExecution` | `string` | `"sequential"` | Tool execution mode: `sequential` (one at a time) or `parallel` (concurrent) |
+
+**Example / 示例：**
+
+```json
+{
+  "provider": "deepseek",
+  "model": "deepseek-chat",
+  "thinkingLevel": "off",
+  "maxTokens": 16384,
+  "systemPrompt": "You are an expert TypeScript developer.",
+  "toolExecution": "parallel"
+}
+```
+
+---
+
+### `~/.mini-pi/auth.json` — API Keys / 密钥存储
+
+| Field / 字段 | Type / 类型 | Description / 说明 |
+|-------------|------------|-------------------|
+| `apiKeys` | `object` | Provider-scoped API keys. Key = provider name, value = API key |
+
+**Example / 示例：**
+
+```json
+{
+  "apiKeys": {
+    "openai": "sk-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+    "anthropic": "sk-ant-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+    "deepseek": "sk-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+    "google": "AIzaxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+    "openrouter": "sk-or-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+  }
+}
+```
+
+---
 
 ### CLI Options / 命令行选项
 
@@ -123,18 +178,30 @@ Config files are stored in `~/.mini-pi/`:
 | `-k, --api-key <key>` | API key |
 | `-b, --base-url <url>` | API base URL override |
 | `-t, --thinking <level>` | Thinking level: `off\|low\|medium\|high` |
+| `-c, --config` | Print current configuration |
 | `-l, --list-models` | List available models / 列出可用模型 |
 | `-h, --help` | Show help / 显示帮助 |
 
+CLI flags take **highest priority**, overriding both config file and environment variables.
+
 ### Environment Variables / 环境变量
 
-```
-OPENAI_API_KEY       OpenAI
-ANTHROPIC_API_KEY    Anthropic
-DEEPSEEK_API_KEY     DeepSeek
-GOOGLE_API_KEY       Google Gemini
-OPENROUTER_API_KEY   OpenRouter
-```
+Environment variables have **higher priority** than `auth.json`, but lower than CLI flags.
+
+| Variable / 变量 | Provider |
+|-----------------|----------|
+| `OPENAI_API_KEY` | OpenAI |
+| `ANTHROPIC_API_KEY` | Anthropic |
+| `DEEPSEEK_API_KEY` | DeepSeek |
+| `GOOGLE_API_KEY` | Google Gemini |
+| `OPENROUTER_API_KEY` | OpenRouter |
+
+### Priority (High → Low) / 优先级（高 → 低）
+
+1. **CLI flags** (`-k`, `-m`, `-p`, `-b`, `-t`)
+2. **Environment variables** (`OPENAI_API_KEY`, etc.)
+3. **Config files** (`~/.mini-pi/config.json`, `~/.mini-pi/auth.json`)
+4. **Built-in defaults** (shown in tables above)
 
 ---
 

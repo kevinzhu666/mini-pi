@@ -1,0 +1,16 @@
+{
+  "//_comment1": "Mini Pi Agent API Key 配置文件样例 — 复制此文件到 ~/.mini-pi/auth.json 并填入你的密钥",
+  "//_comment2": "Mini Pi Agent auth config example — copy to ~/.mini-pi/auth.json and fill in your keys",
+  "//_comment3": "安全提示：auth.json 已包含在 .gitignore 中，不会提交到版本控制",
+  "//_comment4": "Security: this file is never committed (added to .gitignore)",
+
+  "apiKeys": {
+    "openai": "sk-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+    "anthropic": "sk-ant-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+    "deepseek": "sk-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+    "google": "AIzaxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+    "openrouter": "sk-or-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+  },
+  "//_apiKeys_note": "按服务商名称存储 API Key。也可通过环境变量设置（优先级更高）",
+  "//_apiKeys_env": "Env vars: OPENAI_API_KEY, ANTHROPIC_API_KEY, DEEPSEEK_API_KEY, GOOGLE_API_KEY, OPENROUTER_API_KEY"
+}

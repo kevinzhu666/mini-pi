@@ -24,6 +24,7 @@ Mini Pi Agent 已具备记忆系统（Layer 1 显式记忆 + Layer 2 自动注�
 | 会话命名 | **时间戳自动 ID**（`YYYYMMDD-HHMMSS`）+ 可选别名 |
 | 实现架构 | **方案 A：独立 `SessionManager` 模块**（镜像 `MemoryManager` 模式） |
 | `/clear` 与 `/reset` | **合并为 `/clear`**，`/reset` 彻底删除 |
+| `/quit` 与 `/exit` | **删除 `/quit`**，保留 `/exit`（二者是同一分支的别名） |
 | `--sessions` CLI 参数 | **不加**，只在 REPL 内用 `/sessions` |
 
 ## 3. 文件格式与存储布局
@@ -126,6 +127,10 @@ export class SessionManager {
 - `/clear` 合并为**完整重置**：`agent.reset()` + `console.clear()` + **轮换到新会话**（生成新 ID，旧会话文件保留），提示 `Started new session <新id> (previous: <旧id>)`。
 - `/reset` **彻底删除**（代码、`/help`、README 同步移除）。
 - **空会话不立即写盘**：新会话等第一轮 `agent_end` 才落文件，避免磁盘堆满空文件。
+
+### 变更：`/quit` 与 `/exit`
+
+- `/quit` **彻底删除**，保留 `/exit`（二者是同一代码分支的别名，代码、`/help`、README 同步移除）。
 
 ### CLI 新参数
 

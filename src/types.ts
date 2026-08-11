@@ -249,3 +249,24 @@ export interface AfterToolCallResult {
   isError?: boolean;
   terminate?: boolean;
 }
+
+// ─── Session Persistence ─────────────────────────────────────────────────────
+
+export interface SessionMeta {
+  version: number;
+  id: string;
+  alias?: string;
+  /** Auto-title from the first user message (computed by SessionManager.list). */
+  title?: string;
+  cwd: string;
+  provider: string;
+  model: string;
+  thinkingLevel: ThinkingLevel;
+  createdAt: number;
+  updatedAt: number;
+  messageCount: number;
+}
+
+export interface SessionFile extends SessionMeta {
+  messages: AgentMessage[];
+}

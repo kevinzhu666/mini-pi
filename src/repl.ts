@@ -64,8 +64,8 @@ export class MiniPiREPL {
   private running = false;
   private abortController: AbortController | null = null;
   private isStreaming = false;
-  /** Per-block character counts already emitted for the current streaming assistant message. */
-  private streamShown: number[] = [];
+  /** Streaming state per block of the current assistant message: body chars shown + decorative suffix emitted. */
+  private streamState: { bodyShown: number; suffixDone: boolean }[] = [];
   private autoRun = false;
   private memoryManager: MemoryManager;
   private sessionManager: SessionManager;
@@ -345,7 +345,7 @@ Guidelines:
       case "message_start":
         if (event.message.role === "assistant") {
           this.isStreaming = true;
-          this.streamShown = [];
+          this.streamState = [];
         }
         break;
 
@@ -358,11 +358,11 @@ Guidelines:
         if (event.message.role === "assistant") {
           this.isStreaming = false;
           // Flush any content not yet streamed, then terminate the streaming line.
-          this.emitStreamUpdate(event.message as AssistantMessage);
-          if (this.streamShown.length > 0) {
+          this.finishStream(event.message as AssistantMessage);
+          if (this.streamState.length > 0) {
             process.stdout.write("\n\n");
           }
-          this.streamShown = [];
+          this.streamState = [];
         } else if (event.message.role === "toolResult") {
           const tr = event.message as ToolResultMessage;
           const toolContent = tr.content.map((c) => c.type === "text" ? c.text : "[image]").join("\n");
@@ -405,33 +405,55 @@ Guidelines:
   }
 
   /** Build the displayable blocks of an assistant message (text + thinking). */
-  private streamBlocks(msg: AssistantMessage): { text: string; color: keyof typeof colors }[] {
+  private streamBlocks(msg: AssistantMessage): { prefix: string; body: string; suffix: string; color: keyof typeof colors }[] {
     return msg.content
       .filter((b) => b.type === "text" || b.type === "thinking")
-      .map((b): { text: string; color: keyof typeof colors } =>
+      .map((b): { prefix: string; body: string; suffix: string; color: keyof typeof colors } =>
         b.type === "text"
-          ? { text: b.text, color: "cyan" }
-          : { text: `[thinking: ${b.thinking.slice(0, 100)}...]`, color: "dim" }
+          ? { prefix: "", body: b.text, suffix: "", color: "cyan" }
+          : { prefix: "[thinking: ", body: b.thinking.slice(0, 100), suffix: "...]", color: "dim" }
       );
   }
 
   /**
    * Incrementally emit the display text for an assistant message, printing only
-   * the portion not shown yet. Appends per block — no ANSI cursor control — so
-   * it renders correctly even in terminals without clear-and-rewrite support.
+   * the portion not shown yet. Static decorations (`[thinking: ` / `...]`) are
+   * emitted once per block; only the growing body is streamed. Appends per block
+   * — no ANSI cursor control — so it renders correctly in every terminal.
    */
   private emitStreamUpdate(msg: AssistantMessage): void {
     const blocks = this.streamBlocks(msg);
     for (let i = 0; i < blocks.length; i++) {
-      if (i >= this.streamShown.length) {
+      let st = this.streamState[i];
+      if (!st) {
         if (i > 0) process.stdout.write("\n");
-        this.streamShown.push(0);
+        if (blocks[i].prefix) process.stdout.write(colorize(blocks[i].prefix, blocks[i].color));
+        st = this.streamState[i] = { bodyShown: 0, suffixDone: false };
       }
-      const display = blocks[i].text;
-      const shown = this.streamShown[i];
-      if (display.length > shown) {
-        process.stdout.write(colorize(display.slice(shown), blocks[i].color));
-        this.streamShown[i] = display.length;
+      const block = blocks[i];
+      if (block.body.length > st.bodyShown) {
+        process.stdout.write(colorize(block.body.slice(st.bodyShown), block.color));
+        st.bodyShown = block.body.length;
+      }
+      // A block followed by another is complete — close its decorative suffix now.
+      if (i < blocks.length - 1 && !st.suffixDone) {
+        if (block.suffix) process.stdout.write(colorize(block.suffix, block.color));
+        st.suffixDone = true;
+      }
+    }
+  }
+
+  /** Flush remaining streaming content and close the final block's decorative suffix. */
+  private finishStream(msg: AssistantMessage): void {
+    this.emitStreamUpdate(msg);
+    const blocks = this.streamBlocks(msg);
+    const i = blocks.length - 1;
+    if (i >= 0) {
+      const st = this.streamState[i];
+      const block = blocks[i];
+      if (st && !st.suffixDone && block.suffix) {
+        process.stdout.write(colorize(block.suffix, block.color));
+        st.suffixDone = true;
       }
     }
   }

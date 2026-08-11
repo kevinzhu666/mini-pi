@@ -371,6 +371,7 @@ Guidelines:
 
       case "agent_end": {
         this.isStreaming = false;
+        if (this.agent.messages.length > 0) this.saveCurrentSession();
         break;
       }
     }
@@ -418,7 +419,8 @@ Guidelines:
   private async handleCommand(input: string): Promise<boolean> {
     const trimmed = input.trim();
 
-    if (trimmed === "/quit" || trimmed === "/exit") {
+    if (trimmed === "/exit") {
+      if (this.agent.messages.length > 0) this.saveCurrentSession();
       process.stdout.write("Goodbye!\n");
       this.running = false;
       this.rl.close();

@@ -54,6 +54,13 @@ export interface MiniPiREPLOptions {
   sessionId?: string;
   /** Test seam: pre-set responses for the faux provider (offline smoke testing). */
   fauxResponses?: FauxResponse[];
+  /**
+   * Test seam: stream faux responses at this rate so the REPL actually sees
+   * incremental deltas (the real providers deliver content over time). Without
+   * it the faux provider emits every chunk in one synchronous burst and the
+   * streaming-render path is never exercised.
+   */
+  fauxTokensPerSecond?: number;
 }
 
 export class MiniPiREPL {
@@ -74,6 +81,7 @@ export class MiniPiREPL {
   private sessionCreatedAt?: number;
   private resumed = false;
   private fauxResponses?: FauxResponse[];
+  private fauxTokensPerSecond?: number;
   /** Piped (non-TTY) input handling — readline delivers all lines at once, so buffer and drain them. */
   private pipedLines: string[] | null = null;
   private pipedWaiters: Array<(line: string | null) => void> = [];
@@ -84,6 +92,7 @@ export class MiniPiREPL {
     this.config = config;
     this.autoRun = options?.autoRun ?? false;
     this.fauxResponses = options?.fauxResponses;
+    this.fauxTokensPerSecond = options?.fauxTokensPerSecond;
 
     // Initialize providers
     this.initProviders();
@@ -205,7 +214,7 @@ export class MiniPiREPL {
     }
 
     // Always register faux provider for testing
-    const faux = createFauxProvider();
+    const faux = createFauxProvider(this.fauxTokensPerSecond ? { tokensPerSecond: this.fauxTokensPerSecond } : {});
     registerProvider(faux);
     if (this.fauxResponses?.length) {
       faux.setResponses(this.fauxResponses);

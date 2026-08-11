@@ -157,7 +157,7 @@ async function main(): Promise<void> {
   } else if (positional.length > 0) {
     // Single prompt mode
     const prompt = positional.join(" ");
-    const repl = new MiniPiREPL(cwd, config, true);
+    const repl = new MiniPiREPL(cwd, config, { autoRun: true });
     // Override argv to include the prompt
     process.argv = process.argv.slice(0, 2).concat(prompt);
     await repl.run();

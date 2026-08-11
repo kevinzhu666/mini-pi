@@ -7,10 +7,18 @@ import * as readline from "node:readline";
 import * as fs from "node:fs";
 import * as path from "node:path";
 import { Agent, type AgentOptions } from "./agent.js";
-import type { AgentEvent, AgentMessage, AssistantMessage, ToolResultMessage } from "./types.js";
+import type {
+  AgentEvent,
+  AgentMessage,
+  AssistantMessage,
+  SessionFile,
+  SessionMeta,
+  ToolResultMessage,
+} from "./types.js";
 import { createDefaultTools, createCodingTools } from "./tools.js";
 import { ConfigManager, BUILTIN_MODELS, findBuiltinModel } from "./config.js";
-import { registerProvider, createOpenAIProvider, createFauxProvider } from "./provider.js";
+import { registerProvider, createOpenAIProvider, createFauxProvider, type FauxResponse } from "./provider.js";
+import { SessionManager } from "./session.js";
 import { MemoryManager } from "./memory.js";
 
 // ─── Colors ──────────────────────────────────────────────────────────────────
@@ -34,6 +42,14 @@ function colorize(text: string, color: keyof typeof colors): string {
 
 // ─── REPL ───────────────────────────────────────────────────────────────────
 
+export interface MiniPiREPLOptions {
+  autoRun?: boolean;
+  /** Resume a saved session by id on startup. */
+  sessionId?: string;
+  /** Test seam: pre-set responses for the faux provider (offline smoke testing). */
+  fauxResponses?: FauxResponse[];
+}
+
 export class MiniPiREPL {
   private agent: Agent;
   private config: ConfigManager;
@@ -45,11 +61,18 @@ export class MiniPiREPL {
   private currentLines: string[] = [];
   private autoRun = false;
   private memoryManager: MemoryManager;
+  private sessionManager: SessionManager;
+  private currentSessionId?: string;
+  private currentAlias?: string;
+  private sessionCreatedAt?: number;
+  private resumed = false;
+  private fauxResponses?: FauxResponse[];
 
-  constructor(cwd: string, config: ConfigManager, autoRun?: boolean) {
+  constructor(cwd: string, config: ConfigManager, options?: MiniPiREPLOptions) {
     this.cwd = cwd;
     this.config = config;
-    this.autoRun = autoRun ?? false;
+    this.autoRun = options?.autoRun ?? false;
+    this.fauxResponses = options?.fauxResponses;
 
     // Initialize providers
     this.initProviders();
@@ -80,6 +103,10 @@ export class MiniPiREPL {
 
     // Subscribe to agent events for display
     this.agent.subscribe((event) => this.handleAgentEvent(event));
+
+    // Initialize session persistence
+    this.sessionManager = new SessionManager();
+    this.initializeSession(options?.sessionId);
 
     this.rl = readline.createInterface({
       input: process.stdin,
@@ -151,7 +178,11 @@ export class MiniPiREPL {
     }
 
     // Always register faux provider for testing
-    registerProvider(createFauxProvider());
+    const faux = createFauxProvider();
+    registerProvider(faux);
+    if (this.fauxResponses?.length) {
+      faux.setResponses(this.fauxResponses);
+    }
   }
 
   private buildSystemPrompt(): string {
@@ -212,6 +243,69 @@ Guidelines:
       contextWindow: 128000,
       maxTokens: this.config.maxTokens,
     };
+  }
+
+  // ─── Session Persistence ──────────────────────────────────────────────
+
+  private initializeSession(sessionId?: string): void {
+    if (sessionId) {
+      const sf = this.sessionManager.load(sessionId);
+      if (sf) {
+        this.applySessionFile(sf);
+        this.resumed = true;
+        return;
+      }
+      process.stdout.write(colorize(`Session "${sessionId}" not found, starting a new one.\n`, "yellow"));
+    }
+    this.startNewSession();
+  }
+
+  private startNewSession(): void {
+    this.currentSessionId = this.sessionManager.generateId();
+    this.currentAlias = undefined;
+    this.sessionCreatedAt = Date.now();
+  }
+
+  /** Apply a loaded session file to agent + config. Used by startup resume and /resume. */
+  private applySessionFile(sf: SessionFile): void {
+    this.agent.reset();
+    this.agent.messages = sf.messages;
+    this.agent.thinkingLevel = sf.thinkingLevel;
+    this.config.thinkingLevel = sf.thinkingLevel;
+    const model = findBuiltinModel(sf.provider, sf.model);
+    if (model) {
+      this.agent.model = model;
+      this.config.provider = sf.provider;
+      this.config.modelId = sf.model;
+    } else {
+      process.stdout.write(colorize(`Model ${sf.provider}/${sf.model} not found, using current\n`, "yellow"));
+    }
+    this.currentSessionId = sf.id;
+    this.currentAlias = sf.alias;
+    this.sessionCreatedAt = sf.createdAt;
+  }
+
+  /** Assemble agent + config state into a SessionFile and persist it. */
+  private saveCurrentSession(): void {
+    if (!this.currentSessionId) return;
+    const now = Date.now();
+    const session: SessionFile = {
+      version: 1,
+      id: this.currentSessionId,
+      alias: this.currentAlias,
+      cwd: this.cwd,
+      provider: this.agent.model.provider,
+      model: this.agent.model.id,
+      thinkingLevel: this.agent.thinkingLevel,
+      createdAt: this.sessionCreatedAt ?? now,
+      updatedAt: now,
+      messageCount: this.agent.messages.length,
+      messages: this.agent.messages,
+    };
+    if (!this.sessionManager.save(session)) {
+      // Spec §7: save failure is visible to the user, not silent.
+      process.stdout.write(colorize("Warning: could not save session (non-serializable data?).\n", "dim"));
+    }
   }
 
   // ─── Agent Event Handler ──────────────────────────────────────────────
@@ -565,6 +659,10 @@ Guidelines:
 
     process.stdout.write(colorize(`Model: ${this.config.provider}/${this.config.modelId}\n`, "dim"));
     process.stdout.write(colorize(`CWD: ${this.cwd}\n`, "dim"));
+    if (this.currentSessionId) {
+      const label = this.resumed ? `resumed · ${this.agent.messages.length} messages` : "new";
+      process.stdout.write(colorize(`Session: ${this.currentSessionId} (${label})\n`, "dim"));
+    }
     if (this.memoryManager.count > 0) {
       process.stdout.write(colorize(`Memory: ${this.memoryManager.count} facts loaded\n`, "dim"));
     }

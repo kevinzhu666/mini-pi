@@ -17,7 +17,7 @@ import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
 import { ConfigManager } from "../src/config.js";
-import { MiniPiREPL } from "../src/repl.js";
+import { MiniPiREPL, MAX_THINKING_CHARS } from "../src/repl.js";
 import { fauxAssistantMessage } from "../src/provider.js";
 
 let failures = 0;
@@ -35,12 +35,21 @@ const count = (s: string, sub: string): number => s.split(sub).length - 1;
 /** Cursor movement (up/down/left/right) and line/screen erase sequences. */
 const cursorCodes = /\x1b\[[0-9]*[A-HKJ]/;
 
-// Long thinking (>100 chars) so the display truncates and streams many deltas.
+// Long thinking (>MAX_THINKING_CHARS) so the display truncates and streams many
+// deltas. A unique marker sits beyond the truncation point so the test can
+// prove the tail is actually hidden on screen.
 const LONG_THINKING =
-  "The user is asking \"今天发生的大事有哪些\" (What major events happened today?). " +
-  "This is a question about current events and news. I do not have access to " +
-  "real-time news or internet browsing, so I cannot answer from live sources. " +
-  "I should be honest about that limitation and offer to help in other ways.";
+  "The user asked \"今天发生的大事有哪些\" (What major events happened today?). " +
+  "This is a question about current events and news. I have no access to " +
+  "real-time news or internet browsing, so I cannot answer from live sources, " +
+  "and I should be honest about that limitation rather than inventing events. " +
+  "Making up headlines would mislead the user, which is worse than saying I " +
+  "cannot browse. The right move is to say so plainly, then pivot to things I " +
+  "actually can do in this workspace: read files, search the codebase, edit " +
+  "source files under the mini-pi project, and run commands. I should also " +
+  "offer concrete ways the user can get the news themselves, like curling an " +
+  "RSS feed. Let me keep the reply short, warm, and useful. " +
+  "[[TAIL-BEYOND-500]]";
 const TEXT = "抱歉，我没有实时获取新闻的能力。";
 
 async function main(): Promise<void> {
@@ -83,6 +92,13 @@ async function main(): Promise<void> {
   assert(parts.length >= 4, `3 turns rendered (got ${parts.length - 1})`);
   const [s1, s2, s3] = parts.slice(1, 4);
 
+  // Premise guards: LONG_THINKING must actually be truncated for the
+  // tail-hidden assertion below to mean anything.
+  assert(LONG_THINKING.length > MAX_THINKING_CHARS,
+    `LONG_THINKING exceeds truncation cap (${LONG_THINKING.length} > ${MAX_THINKING_CHARS})`);
+  assert(LONG_THINKING.indexOf("[[TAIL-BEYOND-500]]") >= MAX_THINKING_CHARS,
+    "end marker sits beyond the truncation point");
+
   // Global: the append-only renderer must not use ANSI cursor control.
   assert(!cursorCodes.test(captured), "no ANSI cursor-control codes emitted");
 
@@ -90,7 +106,8 @@ async function main(): Promise<void> {
   assert(count(s1, "[thinking: ") === 1, `turn1 [thinking: once (got ${count(s1, "[thinking: ")})`);
   assert(count(s1, "...]") === 1, `turn1 "...]" once (got ${count(s1, "...]")})`);
   const plain1 = stripAnsi(s1);
-  assert(plain1.includes(LONG_THINKING.slice(0, 100)), "turn1 thinking truncated at 100 chars");
+  assert(plain1.includes(LONG_THINKING.slice(0, MAX_THINKING_CHARS)), "turn1 thinking shown up to truncation cap");
+  assert(!plain1.includes("[[TAIL-BEYOND-500]]"), "turn1 thinking tail hidden beyond truncation");
   assert(plain1.includes(TEXT), "turn1 text present");
   assert(plain1.indexOf("[thinking: ") < plain1.indexOf(TEXT), "turn1 thinking printed before text");
 

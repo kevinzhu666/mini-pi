@@ -40,6 +40,9 @@ function colorize(text: string, color: keyof typeof colors): string {
   return `${colors[color]}${text}${colors.reset}`;
 }
 
+/** Thinking is shown dimmed and truncated on screen; the full text is always saved to the session file. */
+export const MAX_THINKING_CHARS = 500;
+
 function formatSessionTime(ts: number): string {
   const d = new Date(ts);
   const pad = (n: number) => String(n).padStart(2, "0");
@@ -420,7 +423,7 @@ Guidelines:
       .map((b): { prefix: string; body: string; suffix: string; color: keyof typeof colors } =>
         b.type === "text"
           ? { prefix: "", body: b.text, suffix: "", color: "cyan" }
-          : { prefix: "[thinking: ", body: b.thinking.slice(0, 100), suffix: "...]", color: "dim" }
+          : { prefix: "[thinking: ", body: b.thinking.slice(0, MAX_THINKING_CHARS), suffix: "...]", color: "dim" }
       );
   }
 

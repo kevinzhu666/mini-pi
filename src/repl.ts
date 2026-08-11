@@ -64,7 +64,8 @@ export class MiniPiREPL {
   private running = false;
   private abortController: AbortController | null = null;
   private isStreaming = false;
-  private currentLines: string[] = [];
+  /** Per-block character counts already emitted for the current streaming assistant message. */
+  private streamShown: number[] = [];
   private autoRun = false;
   private memoryManager: MemoryManager;
   private sessionManager: SessionManager;
@@ -344,27 +345,24 @@ Guidelines:
       case "message_start":
         if (event.message.role === "assistant") {
           this.isStreaming = true;
-          this.currentLines = [];
+          this.streamShown = [];
         }
         break;
 
       case "message_update": {
-        const content = this.getDisplayText(event.message);
-        // Clear current line and rewrite
-        this.clearStreamingLine();
-        this.currentLines = this.wrapText(content);
-        this.printStreamingLine();
+        this.emitStreamUpdate(event.message);
         break;
       }
 
       case "message_end":
         if (event.message.role === "assistant") {
           this.isStreaming = false;
-          const content = this.getDisplayText(event.message as AssistantMessage);
-          this.clearStreamingLine();
-          if (content) {
-            process.stdout.write(colorize(content, "cyan") + "\n\n");
+          // Flush any content not yet streamed, then terminate the streaming line.
+          this.emitStreamUpdate(event.message as AssistantMessage);
+          if (this.streamShown.length > 0) {
+            process.stdout.write("\n\n");
           }
+          this.streamShown = [];
         } else if (event.message.role === "toolResult") {
           const tr = event.message as ToolResultMessage;
           const toolContent = tr.content.map((c) => c.type === "text" ? c.text : "[image]").join("\n");
@@ -406,41 +404,36 @@ Guidelines:
     }
   }
 
-  private getDisplayText(msg: AssistantMessage): string {
+  /** Build the displayable blocks of an assistant message (text + thinking). */
+  private streamBlocks(msg: AssistantMessage): { text: string; color: keyof typeof colors }[] {
     return msg.content
       .filter((b) => b.type === "text" || b.type === "thinking")
-      .map((b) => b.type === "text" ? b.text : colorize(`[thinking: ${b.thinking.slice(0, 100)}...]`, "dim"))
-      .join("\n");
+      .map((b): { text: string; color: keyof typeof colors } =>
+        b.type === "text"
+          ? { text: b.text, color: "cyan" }
+          : { text: `[thinking: ${b.thinking.slice(0, 100)}...]`, color: "dim" }
+      );
   }
 
-  private clearStreamingLine(): void {
-    for (let i = 0; i < this.currentLines.length; i++) {
-      readline.moveCursor(process.stdout, 0, -1);
-      readline.clearLine(process.stdout, 0);
-    }
-  }
-
-  private printStreamingLine(): void {
-    for (const line of this.currentLines) {
-      process.stdout.write(colorize(line, "cyan") + "\n");
-    }
-  }
-
-  private wrapText(text: string): string[] {
-    const width = process.stdout.columns || 80;
-    const lines: string[] = [];
-    for (const line of text.split("\n")) {
-      if (line.length <= width) {
-        lines.push(line);
-      } else {
-        let remaining = line;
-        while (remaining.length > 0) {
-          lines.push(remaining.slice(0, width));
-          remaining = remaining.slice(width);
-        }
+  /**
+   * Incrementally emit the display text for an assistant message, printing only
+   * the portion not shown yet. Appends per block — no ANSI cursor control — so
+   * it renders correctly even in terminals without clear-and-rewrite support.
+   */
+  private emitStreamUpdate(msg: AssistantMessage): void {
+    const blocks = this.streamBlocks(msg);
+    for (let i = 0; i < blocks.length; i++) {
+      if (i >= this.streamShown.length) {
+        if (i > 0) process.stdout.write("\n");
+        this.streamShown.push(0);
+      }
+      const display = blocks[i].text;
+      const shown = this.streamShown[i];
+      if (display.length > shown) {
+        process.stdout.write(colorize(display.slice(shown), blocks[i].color));
+        this.streamShown[i] = display.length;
       }
     }
-    return lines;
   }
 
   // ─── Commands ─────────────────────────────────────────────────────────

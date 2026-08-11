@@ -26,6 +26,8 @@ export type {
   StopReason,
   Usage,
   ThinkingLevel,
+  SessionMeta,
+  SessionFile,
   ToolExecutionMode,
   QueueMode,
   BeforeToolCallContext,
@@ -85,6 +87,9 @@ export {
   findBuiltinModel,
   getModelsByProvider,
 } from "./config.js";
+
+// Session
+export { SessionManager } from "./session.js";
 
 // REPL
 export { MiniPiREPL } from "./repl.js";

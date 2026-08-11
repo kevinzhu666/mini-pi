@@ -74,17 +74,20 @@ export class SessionManager {
     }
   }
 
-  /** Generate a timestamp ID: YYYYMMDD-HHMMSS. On same-second collision, append -1, -2, … */
-  generateId(): string {
+  /**
+   * Generate a timestamp ID: YYYYMMDD-HHMMSS. On same-second collision, append -1, -2, …
+   * `excluded` also reserves in-memory ids (e.g. a freshly rotated, not-yet-saved session).
+   */
+  generateId(excluded?: ReadonlySet<string>): string {
     this.ensureDir();
     const now = new Date();
     const pad = (n: number) => String(n).padStart(2, "0");
     const base =
       `${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}-` +
       `${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}`;
-    if (!fs.existsSync(this.filePath(base))) return base;
+    if (!fs.existsSync(this.filePath(base)) && !excluded?.has(base)) return base;
     let suffix = 1;
-    while (fs.existsSync(this.filePath(`${base}-${suffix}`))) suffix++;
+    while (fs.existsSync(this.filePath(`${base}-${suffix}`)) || excluded?.has(`${base}-${suffix}`)) suffix++;
     return `${base}-${suffix}`;
   }
 

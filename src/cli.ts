@@ -27,6 +27,7 @@ OPTIONS:
   -k, --api-key <key>        API key for the provider
   -b, --base-url <url>       API base URL override
   -t, --thinking <level>     Thinking level: off|low|medium|high
+  -s, --session <id>    Resume a saved session
   -c, --config               Print current configuration
   -l, --list-models          List available models
   -h, --help                 Show this help
@@ -74,6 +75,7 @@ async function main(): Promise<void> {
   let apiKey: string | undefined;
   let baseUrl: string | undefined;
   let thinkingLevel: string | undefined;
+  let sessionId: string | undefined;
   let showHelp = false;
   let showModels = false;
   const positional: string[] = [];
@@ -108,6 +110,10 @@ async function main(): Promise<void> {
       case "-t":
       case "--thinking":
         thinkingLevel = args[++i];
+        break;
+      case "-s":
+      case "--session":
+        sessionId = args[++i];
         break;
       case "-c":
       case "--config":
@@ -152,18 +158,18 @@ async function main(): Promise<void> {
 
   if (isInteractive) {
     // Interactive REPL
-    const repl = new MiniPiREPL(cwd, config);
+    const repl = new MiniPiREPL(cwd, config, { sessionId });
     await repl.run();
   } else if (positional.length > 0) {
     // Single prompt mode
     const prompt = positional.join(" ");
-    const repl = new MiniPiREPL(cwd, config, { autoRun: true });
+    const repl = new MiniPiREPL(cwd, config, { autoRun: true, sessionId });
     // Override argv to include the prompt
     process.argv = process.argv.slice(0, 2).concat(prompt);
     await repl.run();
   } else {
     // Non-interactive (piped), use REPL with first line
-    const repl = new MiniPiREPL(cwd, config);
+    const repl = new MiniPiREPL(cwd, config, { sessionId });
     await repl.run();
   }
 }

@@ -41,7 +41,7 @@ const id = sm.generateId();
 assert(/^\d{8}-\d{6}(-\d+)?$/.test(id), `generateId shape: ${id}`);
 
 // 2. save / load round-trip
-sm.save(base);
+assert(sm.save(base) === true, "save returns true");
 const loaded = sm.load(base.id);
 assert(loaded !== null, "load returns the session");
 assert(loaded?.messages.length === 1, "messages round-trip");
@@ -74,11 +74,25 @@ fs.writeFileSync(path.join(dir, "v99.json"), JSON.stringify({ ...base, id: "v99"
 const after = sm.list();
 assert(after.sessions.length === 2, "corrupt + version-mismatch skipped");
 assert(after.corrupted === 2, `corrupted count = 2 (got ${after.corrupted})`);
+assert(sm.load("bad") === null, "load corrupt → null");
+assert(sm.load("v99") === null, "load version-mismatch → null");
+assert(sm.load("../etc/passwd") === null, "load rejects path-traversal id");
 
 // 6. delete
 assert(sm.delete("20260810-130000") === true, "delete success");
 assert(sm.delete("20260810-130000") === false, "delete missing → false");
 assert(sm.load("20260810-130000") === null, "deleted session gone");
+
+// 7. title from plain-string content
+const strSession: SessionFile = {
+  ...base,
+  id: "20260810-150000",
+  updatedAt: 5,
+  messages: [{ role: "user", content: "Plain string hello", timestamp: 1 }] as AgentMessage[],
+};
+sm.save(strSession);
+const titled = sm.list().sessions.find((s) => s.id === "20260810-150000");
+assert(titled?.title === "Plain string hello", `title from string content (${titled?.title})`);
 
 // cleanup
 fs.rmSync(dir, { recursive: true, force: true });

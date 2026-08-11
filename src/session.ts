@@ -9,7 +9,7 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
 import * as os from "node:os";
-import type { AgentMessage, SessionFile, SessionMeta } from "./types.js";
+import type { SessionFile, SessionMeta } from "./types.js";
 
 const DEFAULT_DIR = path.join(os.homedir(), ".mini-pi", "sessions");
 const FILE_VERSION = 1;
@@ -88,18 +88,21 @@ export class SessionManager {
     return `${base}-${suffix}`;
   }
 
-  /** Save a session (overwrites <id>.json; creates the directory if needed). */
-  save(session: SessionFile): void {
+  /** Save a session (overwrites <id>.json; creates the directory if needed). Returns false on failure. */
+  save(session: SessionFile): boolean {
     try {
       this.ensureDir();
       fs.writeFileSync(this.filePath(session.id), JSON.stringify(session, null, 2), "utf-8");
+      return true;
     } catch {
       // Serialization failure (e.g. non-serializable toolResult.details) — caller shows a hint.
+      return false;
     }
   }
 
   /** Load a full session (with messages) by id. Returns null if missing or corrupt. */
   load(id: string): SessionFile | null {
+    if (!/^\d{8}-\d{6}(-\d+)?$/.test(id)) return null;
     try {
       const file = this.filePath(id);
       if (!fs.existsSync(file)) return null;
@@ -146,6 +149,7 @@ export class SessionManager {
 
   /** Delete a session file. Returns true on success. */
   delete(id: string): boolean {
+    if (!/^\d{8}-\d{6}(-\d+)?$/.test(id)) return false;
     try {
       const file = this.filePath(id);
       if (!fs.existsSync(file)) return false;

@@ -99,7 +99,7 @@ git commit -m "feat(session): add SessionMeta and SessionFile types"
 import * as fs from "node:fs";
 import * as path from "node:path";
 import * as os from "node:os";
-import type { AgentMessage, SessionFile, SessionMeta } from "./types.js";
+import type { SessionFile, SessionMeta } from "./types.js";
 
 const DEFAULT_DIR = path.join(os.homedir(), ".mini-pi", "sessions");
 const FILE_VERSION = 1;
@@ -178,18 +178,21 @@ export class SessionManager {
     return `${base}-${suffix}`;
   }
 
-  /** Save a session (overwrites <id>.json; creates the directory if needed). */
-  save(session: SessionFile): void {
+  /** Save a session (overwrites <id>.json; creates the directory if needed). Returns false on failure. */
+  save(session: SessionFile): boolean {
     try {
       this.ensureDir();
       fs.writeFileSync(this.filePath(session.id), JSON.stringify(session, null, 2), "utf-8");
+      return true;
     } catch {
       // Serialization failure (e.g. non-serializable toolResult.details) — caller shows a hint.
+      return false;
     }
   }
 
   /** Load a full session (with messages) by id. Returns null if missing or corrupt. */
   load(id: string): SessionFile | null {
+    if (!/^\d{8}-\d{6}(-\d+)?$/.test(id)) return null;
     try {
       const file = this.filePath(id);
       if (!fs.existsSync(file)) return null;
@@ -236,6 +239,7 @@ export class SessionManager {
 
   /** Delete a session file. Returns true on success. */
   delete(id: string): boolean {
+    if (!/^\d{8}-\d{6}(-\d+)?$/.test(id)) return false;
     try {
       const file = this.filePath(id);
       if (!fs.existsSync(file)) return false;
@@ -296,7 +300,7 @@ const id = sm.generateId();
 assert(/^\d{8}-\d{6}(-\d+)?$/.test(id), `generateId shape: ${id}`);
 
 // 2. save / load round-trip
-sm.save(base);
+assert(sm.save(base) === true, "save returns true");
 const loaded = sm.load(base.id);
 assert(loaded !== null, "load returns the session");
 assert(loaded?.messages.length === 1, "messages round-trip");
@@ -329,11 +333,25 @@ fs.writeFileSync(path.join(dir, "v99.json"), JSON.stringify({ ...base, id: "v99"
 const after = sm.list();
 assert(after.sessions.length === 2, "corrupt + version-mismatch skipped");
 assert(after.corrupted === 2, `corrupted count = 2 (got ${after.corrupted})`);
+assert(sm.load("bad") === null, "load corrupt → null");
+assert(sm.load("v99") === null, "load version-mismatch → null");
+assert(sm.load("../etc/passwd") === null, "load rejects path-traversal id");
 
 // 6. delete
 assert(sm.delete("20260810-130000") === true, "delete success");
 assert(sm.delete("20260810-130000") === false, "delete missing → false");
 assert(sm.load("20260810-130000") === null, "deleted session gone");
+
+// 7. title from plain-string content
+const strSession: SessionFile = {
+  ...base,
+  id: "20260810-150000",
+  updatedAt: 5,
+  messages: [{ role: "user", content: "Plain string hello", timestamp: 1 }] as AgentMessage[],
+};
+sm.save(strSession);
+const titled = sm.list().sessions.find((s) => s.id === "20260810-150000");
+assert(titled?.title === "Plain string hello", `title from string content (${titled?.title})`);
 
 // cleanup
 fs.rmSync(dir, { recursive: true, force: true });
@@ -511,7 +529,10 @@ export interface MiniPiREPLOptions {
       messageCount: this.agent.messages.length,
       messages: this.agent.messages,
     };
-    this.sessionManager.save(session);
+    if (!this.sessionManager.save(session)) {
+      // Spec §7: save failure is visible to the user, not silent.
+      process.stdout.write(colorize("Warning: could not save session (non-serializable data?).\n", "dim"));
+    }
   }
 ```
 

@@ -40,6 +40,12 @@ function colorize(text: string, color: keyof typeof colors): string {
   return `${colors[color]}${text}${colors.reset}`;
 }
 
+function formatSessionTime(ts: number): string {
+  const d = new Date(ts);
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
 // ─── REPL ───────────────────────────────────────────────────────────────────
 
 export interface MiniPiREPLOptions {
@@ -433,8 +439,8 @@ Guidelines:
 ║         Mini Pi Agent - Commands            ║
 ╠══════════════════════════════════════════════╣
 ║ /help            Show this help              ║
-║ /quit, /exit     Exit the REPL               ║
-║ /clear           Clear message history       ║
+║ /exit            Exit the REPL               ║
+║ /clear           Reset + start new session   ║
 ║ /model <name>    Switch model (e.g., gpt-4o) ║
 ║ /provider <name> Switch provider             ║
 ║ /thinking <off|low|medium|high>              ║
@@ -444,7 +450,10 @@ Guidelines:
 ║ /tools           List available tools         ║
 ║ /models          List available models        ║
 ║ /context         Show context stats           ║
-║ /reset           Reset conversation           ║
+║ /sessions        List saved sessions          ║
+║ /resume <id>     Resume a saved session       ║
+║ /session name <n> Set session alias          ║
+║ /session delete <id> Delete a session        ║
 ║ /remember k = v  Remember a fact               ║
 ║ /recall <key>    Recall a fact                ║
 ║ /forget <key>    Forget a fact                ║
@@ -455,16 +464,11 @@ Guidelines:
     }
 
     if (trimmed === "/clear") {
-      console.clear();
-      this.agent.messages = [];
-      this.agent.clearAllQueues();
-      process.stdout.write(colorize("Conversation cleared.\n", "dim"));
-      return true;
-    }
-
-    if (trimmed === "/reset") {
+      const prevId = this.currentSessionId;
       this.agent.reset();
-      process.stdout.write(colorize("Agent state reset.\n", "dim"));
+      console.clear();
+      this.startNewSession();
+      process.stdout.write(colorize(`Started new session ${this.currentSessionId} (previous: ${prevId})\n`, "dim"));
       return true;
     }
 
@@ -569,6 +573,75 @@ Guidelines:
       process.stdout.write(`  Tool results:    ${toolMsgs}\n`);
       process.stdout.write(`  Is streaming:    ${this.agent.isStreaming}\n`);
       process.stdout.write(`  Pending tools:   ${this.agent.pendingToolCalls.size}\n`);
+      return true;
+    }
+
+    // ─── Session Commands ───────────────────────────────────────────────
+
+    if (trimmed === "/sessions") {
+      const { sessions, corrupted } = this.sessionManager.list();
+      if (sessions.length === 0) {
+        process.stdout.write(colorize("No sessions yet.\n", "dim"));
+      } else {
+        process.stdout.write(colorize(`\nSessions:\n`, "bold"));
+        for (const s of sessions) {
+          const active = s.id === this.currentSessionId ? "▶" : " ";
+          const title = s.alias ?? s.title ?? "(no messages)";
+          process.stdout.write(
+            `  ${colorize(active, "green")} ${colorize(s.id, "cyan")} ${title} · ${s.provider}/${s.model} · ${s.messageCount} msgs · ${formatSessionTime(s.updatedAt)}\n`,
+          );
+        }
+        process.stdout.write(colorize(`  ── ${sessions.length} sessions\n\n`, "dim"));
+      }
+      if (corrupted > 0) {
+        process.stdout.write(colorize(`  (${corrupted} corrupted file(s) skipped)\n`, "dim"));
+      }
+      return true;
+    }
+
+    if (trimmed.startsWith("/resume ")) {
+      const id = trimmed.slice("/resume ".length).trim();
+      if (!id) {
+        process.stdout.write(colorize("Usage: /resume <id>\n", "yellow"));
+        return true;
+      }
+      const sf = this.sessionManager.load(id);
+      if (!sf) {
+        process.stdout.write(colorize(`Session "${id}" not found.\n`, "red"));
+        return true;
+      }
+      this.applySessionFile(sf);
+      process.stdout.write(colorize(`Resumed session ${sf.id} · ${sf.messages.length} messages\n`, "green"));
+      return true;
+    }
+
+    if (trimmed.startsWith("/session name ")) {
+      const name = trimmed.slice("/session name ".length).trim();
+      if (!name) {
+        process.stdout.write(colorize("Usage: /session name <名字>\n", "yellow"));
+        return true;
+      }
+      this.currentAlias = name;
+      this.saveCurrentSession();
+      process.stdout.write(colorize(`Session aliased as "${name}"\n`, "green"));
+      return true;
+    }
+
+    if (trimmed.startsWith("/session delete ")) {
+      const id = trimmed.slice("/session delete ".length).trim();
+      if (!id) {
+        process.stdout.write(colorize("Usage: /session delete <id>\n", "yellow"));
+        return true;
+      }
+      if (id === this.currentSessionId) {
+        process.stdout.write(colorize("Cannot delete the current session.\n", "red"));
+        return true;
+      }
+      if (this.sessionManager.delete(id)) {
+        process.stdout.write(colorize(`Deleted session ${id}\n`, "green"));
+      } else {
+        process.stdout.write(colorize(`Session "${id}" not found.\n`, "dim"));
+      }
       return true;
     }
 

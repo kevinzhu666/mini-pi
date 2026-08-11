@@ -90,9 +90,8 @@ Type `/` in the REPL to use commands:
 | Command / 命令 | Description / 说明 |
 |----------------|-------------------|
 | `/help` | Show help / 显示帮助 |
-| `/quit` or `/exit` | Exit REPL / 退出 |
-| `/clear` | Clear conversation history / 清空对话 |
-| `/reset` | Reset agent state / 重置 Agent 状态 |
+| `/exit` | Exit REPL / 退出 |
+| `/clear` | Reset and start a new session / 重置并开始新会话 |
 | `/model <name>` | Switch model (e.g. `gpt-4o`) / 切换模型 |
 | `/provider <name>` | Switch provider / 切换服务商 |
 | `/thinking <off\|low\|medium\|high>` | Set thinking level / 设置推理级别 |
@@ -102,6 +101,10 @@ Type `/` in the REPL to use commands:
 | `/tools` | List available tools / 列出工具 |
 | `/models` | List built-in models / 列出模型 |
 | `/context` | Show context stats / 查看上下文统计 |
+| `/sessions` | List saved sessions / 列出已保存会话 |
+| `/resume <id>` | Resume a saved session / 恢复会话 |
+| `/session name <name>` | Alias the current session / 给当前会话命名 |
+| `/session delete <id>` | Delete a saved session / 删除会话 |
 | `/remember <key> = <value>` | Store a persistent fact / 永久记住一条信息 |
 | `/recall <key>` | Retrieve a stored fact / 回忆一条信息 |
 | `/forget <key>` | Delete a stored fact / 忘记一条信息 |
@@ -182,6 +185,7 @@ cp auth.example.json ~/.mini-pi/auth.json
 | `-k, --api-key <key>` | API key |
 | `-b, --base-url <url>` | API base URL override |
 | `-t, --thinking <level>` | Thinking level: `off\|low\|medium\|high` |
+| `-s, --session <id>` | Resume a saved session / 恢复已保存的会话 |
 | `-c, --config` | Print current configuration |
 | `-l, --list-models` | List available models / 列出可用模型 |
 | `-h, --help` | Show help / 显示帮助 |
@@ -282,6 +286,27 @@ System Prompt (auto-generated):
 
 ---
 
+## 💾 Session Persistence / 会话持久化
+
+对话自动保存到 `~/.mini-pi/sessions/<id>.json`，支持跨启动恢复上下文。
+
+```bash
+>>> /sessions                    # 列出所有会话（最近在前）
+>>> /session name 优化登录流程    # 给当前会话命名
+>>> /exit                        # 退出时自动保存
+```
+
+```bash
+mini-pi -s 20260810-152030       # 启动时恢复该会话
+```
+
+```bash
+>>> /resume 20260810-152030      # REPL 内切换回历史会话
+>>> /session delete 20260810-145500   # 删除指定会话（不能删当前会话）
+```
+
+每个会话一个 JSON 文件，完整保存 user / assistant / toolResult 消息（含工具结果），并记录 provider、model、thinkingLevel。系统提示词是派生状态，不持久化。
+
 ## 🏗 Project Architecture / 项目架构
 
 ```
@@ -340,14 +365,12 @@ npm run debug
 
 - [x] Layer 1: Explicit memory commands (`/remember`, `/recall`, `/forget`, `/memories`)
 - [x] Layer 2: Automatic memory injection into system prompt
+- [x] Layer 3: Session persistence
+  - Auto-save conversation history to `~/.mini-pi/sessions/`
+  - Resume sessions on startup (`-s <id>`) or in-REPL (`/resume <id>`)
+  - Session listing, aliasing, and deletion
 
 ### 🚧 Planned / 规划中
-
-- [ ] **Layer 3: Session Persistence / 会话持久化**
-  - Auto-save conversation history to `~/.mini-pi/sessions/`
-  - Restore previous sessions on startup
-  - Named session snapshots (`/session save`, `/session load`)
-  - `/sessions` command to browse history
 
 - [ ] **Layer 4: Auto-Extraction / 自动事实提取**
   - After each conversation turn, ask the LLM to extract important facts

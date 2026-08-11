@@ -73,6 +73,10 @@ export class MiniPiREPL {
   private sessionCreatedAt?: number;
   private resumed = false;
   private fauxResponses?: FauxResponse[];
+  /** Piped (non-TTY) input handling — readline delivers all lines at once, so buffer and drain them. */
+  private pipedLines: string[] | null = null;
+  private pipedWaiters: Array<(line: string | null) => void> = [];
+  private pipedClosed = false;
 
   constructor(cwd: string, config: ConfigManager, options?: MiniPiREPLOptions) {
     this.cwd = cwd;
@@ -120,6 +124,22 @@ export class MiniPiREPL {
       prompt: "",
       terminal: true,
     });
+
+    // Piped (non-TTY) input arrives all at once; rl.question() would only ever
+    // consume the first line. Buffer every line and drain it in getInput().
+    if (!process.stdin.isTTY) {
+      this.pipedLines = [];
+      this.rl.on("line", (line: string) => {
+        const waiter = this.pipedWaiters.shift();
+        if (waiter) waiter(line);
+        else this.pipedLines!.push(line);
+      });
+      this.rl.on("close", () => {
+        this.pipedClosed = true;
+        const waiter = this.pipedWaiters.shift();
+        if (waiter) waiter(null);
+      });
+    }
   }
 
   private initProviders(): void {
@@ -266,8 +286,11 @@ Guidelines:
     this.startNewSession();
   }
 
+  private usedIds = new Set<string>();
+
   private startNewSession(): void {
-    this.currentSessionId = this.sessionManager.generateId();
+    if (this.currentSessionId) this.usedIds.add(this.currentSessionId);
+    this.currentSessionId = this.sessionManager.generateId(this.usedIds);
     this.currentAlias = undefined;
     this.sessionCreatedAt = Date.now();
   }
@@ -773,19 +796,24 @@ Guidelines:
   }
 
   private getInput(): Promise<string> {
-    return new Promise((resolve) => {
-      const prompt = colorize("\n>>> ", "green");
-
-      if (!this.rl.terminal) {
-        // Non-interactive mode (piped input)
-        this.rl.question(prompt, (answer) => {
-          resolve(answer);
-        });
-      } else {
-        this.rl.question(prompt, (answer) => {
-          resolve(answer);
-        });
+    if (this.pipedLines) {
+      // Piped input: drain buffered lines in order; wait if none buffered yet.
+      if (this.pipedLines.length > 0) {
+        return Promise.resolve(this.pipedLines.shift()!);
       }
+      if (this.pipedClosed) {
+        this.running = false;
+        return Promise.resolve("");
+      }
+      return new Promise((resolve) => {
+        this.pipedWaiters.push((line) => resolve(line ?? ""));
+      });
+    }
+    const prompt = colorize("\n>>> ", "green");
+    return new Promise((resolve) => {
+      this.rl.question(prompt, (answer) => {
+        resolve(answer);
+      });
     });
   }
 

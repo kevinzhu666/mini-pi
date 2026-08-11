@@ -78,6 +78,7 @@ async function main(): Promise<void> {
   let sessionId: string | undefined;
   let showHelp = false;
   let showModels = false;
+  let showConfig = false;
   const positional: string[] = [];
 
   for (let i = 0; i < args.length; i++) {
@@ -117,7 +118,7 @@ async function main(): Promise<void> {
         break;
       case "-c":
       case "--config":
-        // Will show config from ConfigManager
+        showConfig = true;
         break;
       default:
         if (!arg.startsWith("-")) {
@@ -150,6 +151,17 @@ async function main(): Promise<void> {
   if (baseUrl) config.baseUrl = baseUrl;
   if (thinkingLevel && ["off", "low", "medium", "high"].includes(thinkingLevel)) {
     config.thinkingLevel = thinkingLevel as "off" | "low" | "medium" | "high";
+  }
+
+  if (showConfig) {
+    console.log("Current Configuration:");
+    console.log(`  Provider:   ${config.provider}`);
+    console.log(`  Model:      ${config.modelId}`);
+    console.log(`  Thinking:   ${config.thinkingLevel}`);
+    console.log(`  Max Tokens: ${config.maxTokens}`);
+    console.log(`  Base URL:   ${config.baseUrl ?? "(default)"}`);
+    console.log(`  API Key:    ${config.hasApiKey(config.provider) ? "✓ configured" : "✗ not set"}`);
+    process.exit(0);
   }
 
   // Determine mode: interactive or single prompt

@@ -11,6 +11,7 @@
     "google": "AIzaxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
     "openrouter": "sk-or-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
   },
-  "//_apiKeys_note": "按服务商名称存储 API Key。也可通过环境变量设置（优先级更高）",
-  "//_apiKeys_env": "Env vars: OPENAI_API_KEY, ANTHROPIC_API_KEY, DEEPSEEK_API_KEY, GOOGLE_API_KEY, OPENROUTER_API_KEY"
+  "//_apiKeys_note": "按服务商名称存储 API Key。优先级：CLI 参数 > auth.json > 环境变量（auth.json 里没配时才用环境变量）",
+  "//_apiKeys_note_en": "Keys stored per provider. Priority: CLI flags > auth.json > env vars (env used only if auth.json has no key)",
+  "//_apiKeys_env": "Env fallbacks: OPENAI_API_KEY, ANTHROPIC_API_KEY, DEEPSEEK_API_KEY, GOOGLE_API_KEY, OPENROUTER_API_KEY"
 }

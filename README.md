@@ -1,27 +1,29 @@
+> **English** | [**中文**](README.zh-CN.md)
+
 # 🤖 Mini Pi Agent
 
-**Mini Pi Agent** 是一个轻量级的终端 AI 编程助手：在命令行里和 LLM 对话，自动完成读文件、改代码、跑命令等编码任务。
+**Mini Pi Agent** is a lightweight terminal AI coding assistant. Chat with LLMs right in your terminal to read files, edit code, and run commands.
 
-## ✨ 特性
+## ✨ Features
 
-| 特性 | 说明 |
-|------|------|
-| 💬 交互式 REPL | 流式输出，实时显示回答与思考过程 |
-| 🔌 多模型支持 | OpenAI、Anthropic、DeepSeek、Gemini、OpenRouter |
-| 🛠 内置工具集 | read / write / edit / bash / glob / grep |
-| 🧠 推理模型支持 | o3-mini、DeepSeek Reasoner 等推理模型 |
-| 💾 会话持久化 | 自动保存对话，跨启动恢复上下文 |
-| 🧩 Provider 插件化 | 易于扩展新服务商 |
-| ⚡ 零运行时依赖 | 不依赖任何外部运行时包 |
-| 🔐 密钥独立存储 | API Key 单独存于 auth.json，不会进版本库 |
+| Feature | Description |
+|---------|-------------|
+| 💬 Interactive REPL | Streaming output, real-time responses |
+| 🔌 Multi-model support | OpenAI, Anthropic, DeepSeek, Gemini, OpenRouter |
+| 🛠 Built-in toolset | read / write / edit / bash / glob / grep |
+| 🧠 Reasoning models | o3-mini, DeepSeek Reasoner, etc. |
+| 💾 Session persistence | Auto-save conversations, resume across restarts |
+| 🧩 Pluggable providers | Easy to add new providers |
+| ⚡ Zero runtime deps | No external runtime packages |
+| 🔐 Separate API keys | Keys live in auth.json, never committed |
 
 ---
 
-## 🚀 快速开始 Quick Start
+## 🚀 Quick Start
 
-> 前置要求：**Node.js ≥ 18**
+> Prerequisites: **Node.js ≥ 18**
 
-### 1. 安装
+### 1. Install
 
 ```bash
 git clone https://github.com/kevinzhu666/mini-pi.git
@@ -29,9 +31,9 @@ cd mini-pi
 npm install
 ```
 
-### 2. 配置（3 个示例文件一次搞定）
+### 2. Configure (all 3 example files at once)
 
-项目根目录有 `config.example.json`、`auth.example.json`、`memory.example.json` 三个示例，复制到 `~/.mini-pi/` 后只改 `auth.json` 填 API key：
+The repo ships `config.example.json`, `auth.example.json`, and `memory.example.json`. Copy them into `~/.mini-pi/`, then only edit `auth.json` to add your API keys:
 
 ```bash
 mkdir -p ~/.mini-pi/memory
@@ -39,158 +41,158 @@ cp config.example.json  ~/.mini-pi/config.json
 cp auth.example.json    ~/.mini-pi/auth.json
 cp memory.example.json  ~/.mini-pi/memory/memory.json
 
-vi ~/.mini-pi/auth.json   # 把每个 provider 的 key 换成你自己的
+vi ~/.mini-pi/auth.json   # replace the placeholders with your own keys
 ```
 
-- `config.json` — 模型、服务商、推理级别等常规配置
-- `auth.json` — 各服务商的 API Key
-- `memory/memory.json` — 记忆数据
+- `config.json` — model, provider, thinking level, etc.
+- `auth.json` — per-provider API keys
+- `memory/memory.json` — persisted facts
 
-各字段含义见下方 [配置参考](#配置参考-configuration-reference)。
+See the [Configuration Reference](#configuration-reference) below for every field.
 
-### 3. 启动
+### 3. Run
 
 ```bash
-npm run dev      # 开发模式（推荐，改动即时生效）
+npm run dev      # dev mode (recommended, hot reload)
 
-# 或构建后全局安装，直接用 mini-pi 命令：
+# Or build and install globally, then use the mini-pi command:
 npm run build && npm link
 mini-pi
 ```
 
-### 用法示例
+### Usage examples
 
 ```bash
-mini-pi                              # 交互式会话
-mini-pi "写一个二分查找"               # 单次提问
-echo "列出所有 .ts 文件" | mini-pi     # 管道输入
-mini-pi -p deepseek -m deepseek-chat  # 指定服务商和模型
-mini-pi -s 20260810-152030            # 启动时恢复历史会话
+mini-pi                              # interactive session
+mini-pi "write a binary search tree" # single prompt
+echo "list all .ts files" | mini-pi  # piped input
+mini-pi -p deepseek -m deepseek-chat # pick provider and model
+mini-pi -s 20260810-152030           # resume a saved session
 ```
 
 ---
 
-## 配置参考 Configuration Reference
+## Configuration Reference
 
-所有配置都在 `~/.mini-pi/` 下，共 3 个文件：
+Everything lives under `~/.mini-pi/`, in 3 files:
 
-| 文件 | 作用 |
-|------|------|
-| `config.json` | 模型、服务商、推理级别等常规配置 |
-| `auth.json` | 各服务商的 API Key（不会被 git 跟踪） |
-| `memory/memory.json` | 记忆数据（`/remember` 写入的事实） |
+| File | Purpose |
+|------|---------|
+| `config.json` | model, provider, thinking level, etc. |
+| `auth.json` | per-provider API keys (not git-tracked) |
+| `memory/memory.json` | facts stored via `/remember` |
 
-### config.json 字段
+### config.json fields
 
-| 字段 | 类型 | 默认值 | 说明 |
-|------|------|--------|------|
-| `provider` | `string` | `"openai"` | 服务商：`openai` / `anthropic` / `deepseek` / `google` / `openrouter` |
-| `model` | `string` | `"gpt-4o"` | 默认模型 ID（见下方模型表） |
-| `baseUrl` | `string` \| `null` | `null` | 自定义 API 地址（代理/自建时设置，一般留 `null`） |
-| `thinkingLevel` | `string` | `"off"` | 推理级别：`off` / `low` / `medium` / `high` |
-| `systemPrompt` | `string` | `"You are a helpful coding assistant."` | 自定义系统提示词 |
-| `maxTokens` | `number` | `8192` | 每次响应最大输出 Token |
-| `toolExecution` | `string` | `"sequential"` | 工具执行模式：`sequential`（串行）/ `parallel`（并行） |
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `provider` | `string` | `"openai"` | `openai` / `anthropic` / `deepseek` / `google` / `openrouter` |
+| `model` | `string` | `"gpt-4o"` | default model ID (see models table below) |
+| `baseUrl` | `string` \| `null` | `null` | custom API endpoint (proxy/self-host); leave `null` normally |
+| `thinkingLevel` | `string` | `"off"` | `off` / `low` / `medium` / `high` |
+| `systemPrompt` | `string` | `"You are a helpful coding assistant."` | custom system prompt |
+| `maxTokens` | `number` | `8192` | max output tokens per response |
+| `toolExecution` | `string` | `"sequential"` | `sequential` or `parallel` |
 
-### API Key
+### API keys
 
-**优先级：CLI 参数 > `auth.json` > 环境变量。**
+**Priority: CLI flags > `auth.json` > environment variables.**
 
-1. 写在 `auth.json`（推荐）：
+1. Put keys in `auth.json` (recommended):
 
 ```json
 { "apiKeys": { "deepseek": "sk-xxx", "openai": "sk-xxx" } }
 ```
 
-2. 或用环境变量（`auth.json` 里没配时才生效）：
+2. Or use env vars (only used if `auth.json` has no key for that provider):
 
 ```bash
 export DEEPSEEK_API_KEY="sk-..."
 export OPENAI_API_KEY="sk-..."
 ```
 
-> 备注：`OPENAI_API_KEY` 是所有 provider 的兜底环境变量。
+> Note: `OPENAI_API_KEY` is the universal fallback for every provider.
 
-### 命令行参数 CLI Options
+### CLI options
 
-| 参数 | 说明 |
-|------|------|
-| `-m, --model <name>` | 模型 ID |
-| `-p, --provider <name>` | 服务商 |
+| Flag | Description |
+|------|-------------|
+| `-m, --model <name>` | model ID |
+| `-p, --provider <name>` | provider |
 | `-k, --api-key <key>` | API key |
-| `-b, --base-url <url>` | 自定义 API 地址 |
-| `-t, --thinking <level>` | 推理级别：`off\|low\|medium\|high` |
-| `-s, --session <id>` | 启动时恢复会话 |
-| `-c, --config` | 打印当前配置 |
-| `-l, --list-models` | 列出可用模型 |
-| `-h, --help` | 帮助 |
+| `-b, --base-url <url>` | custom API endpoint |
+| `-t, --thinking <level>` | `off\|low\|medium\|high` |
+| `-s, --session <id>` | resume a session on startup |
+| `-c, --config` | print the current configuration |
+| `-l, --list-models` | list available models |
+| `-h, --help` | show help |
 
-CLI 参数优先级最高，覆盖配置文件和环境变量。
-
----
-
-## 🎮 REPL 命令
-
-进入 REPL 后输入 `/` 开头的命令（`/help` 查看全部）：
-
-| 命令 | 说明 |
-|------|------|
-| `/help` | 显示帮助 |
-| `/exit` | 退出 |
-| `/clear` | 重置并开始新会话 |
-| `/model <name>` | 切换模型 |
-| `/provider <name>` | 切换服务商 |
-| `/thinking <off\|low\|medium\|high>` | 设置推理级别 |
-| `/tokens <num>` | 设置最大输出 Token |
-| `/api-key <key>` | 设置 API key |
-| `/config` | 查看当前配置 |
-| `/tools` | 列出可用工具 |
-| `/models` | 列出模型 |
-| `/context` | 查看上下文统计 |
-| `/sessions` | 列出已保存会话 |
-| `/resume <id>` | 恢复会话 |
-| `/session name <name>` | 给当前会话命名 |
-| `/session delete <id>` | 删除会话 |
-| `/remember <key> = <value>` | 记住一条事实 |
-| `/recall <key>` | 回忆一条事实 |
-| `/forget <key>` | 删除一条事实 |
-| `/memories [tag]` | 列出所有记忆 |
+CLI flags take the highest priority, overriding both config files and env vars.
 
 ---
 
-## 💾 会话持久化 Session Persistence
+## 🎮 REPL Commands
 
-对话自动保存到 `~/.mini-pi/sessions/<id>.json`，跨启动恢复上下文：
+Type `/` in the REPL (`/help` lists them all):
+
+| Command | Description |
+|---------|-------------|
+| `/help` | show help |
+| `/exit` | exit |
+| `/clear` | reset and start a new session |
+| `/model <name>` | switch model |
+| `/provider <name>` | switch provider |
+| `/thinking <off\|low\|medium\|high>` | set thinking level |
+| `/tokens <num>` | set max output tokens |
+| `/api-key <key>` | set API key |
+| `/config` | show current config |
+| `/tools` | list tools |
+| `/models` | list models |
+| `/context` | show context stats |
+| `/sessions` | list saved sessions |
+| `/resume <id>` | resume a session |
+| `/session name <name>` | alias the current session |
+| `/session delete <id>` | delete a session |
+| `/remember <key> = <value>` | store a fact |
+| `/recall <key>` | recall a fact |
+| `/forget <key>` | delete a fact |
+| `/memories [tag]` | list all memories |
+
+---
+
+## 💾 Session Persistence
+
+Conversations auto-save to `~/.mini-pi/sessions/<id>.json` and resume across restarts:
 
 ```bash
->>> /sessions                  # 列出所有会话
->>> /session name 优化登录流程   # 给当前会话命名
->>> /resume 20260810-152030    # 恢复历史会话
->>> /exit                      # 退出时自动保存
-mini-pi -s 20260810-152030     # 启动时恢复
+>>> /sessions                  # list all sessions
+>>> /session name login-flow   # alias the current session
+>>> /resume 20260810-152030    # switch back to a session
+>>> /exit                      # auto-save on exit
+mini-pi -s 20260810-152030     # resume on startup
 ```
 
-每个会话一个 JSON 文件，完整保存 user / assistant / toolResult 消息（含工具结果），并记录 provider、model、thinkingLevel。系统提示词是派生状态，不持久化。
+One JSON file per session — user / assistant / toolResult messages (including tool output), plus provider, model, and thinking level. The system prompt is derived state and is not persisted.
 
 ---
 
-## 🧠 记忆系统 Memory
+## 🧠 Memory
 
-- **显式记忆**：用 `/remember key = value` 记录，`/recall` 回忆，数据存于 `~/.mini-pi/memory/memory.json`。
-- **自动注入**：每次提问前，所有记忆自动注入系统提示词，无需手动 `/recall`。
+- **Explicit**: store facts with `/remember key = value`, recall with `/recall`; data lives in `~/.mini-pi/memory/memory.json`.
+- **Auto-injection**: before every prompt, all stored facts are injected into the system prompt — no `/recall` needed.
 
 ```bash
->>> /remember user-profile = Kevin，10余年Java工程师
+>>> /remember user-profile = Kevin, 10+ years Java engineer
 ✓ Remembered "user-profile"
 >>> /recall user-profile
 ```
 
 ---
 
-## 模型列表 Models
+## Models
 
-| 服务商 | 模型 |
-|--------|------|
+| Provider | Models |
+|----------|--------|
 | **OpenAI** | `gpt-4o`, `gpt-4o-mini`, `o3-mini`, `o4-mini`, `gpt-4.1` |
 | **Anthropic** | `claude-sonnet-4-20250514` |
 | **DeepSeek** | `deepseek-chat`, `deepseek-reasoner`, `deepseek-v4-flash`, `deepseek-v4-pro` |
@@ -199,25 +201,25 @@ mini-pi -s 20260810-152030     # 启动时恢复
 
 ---
 
-## 🏗 项目架构 Architecture
+## 🏗 Architecture
 
 ```
 src/
-├── cli.ts            # CLI 入口，参数解析
-├── repl.ts           # 交互式终端界面
-├── agent.ts          # Agent 核心（状态、事件、队列）
-├── agent-loop.ts     # 执行引擎
-├── provider.ts       # LLM Provider 抽象
-├── tools.ts          # 内置工具集
-├── config.ts         # 配置管理 + 模型目录
-├── session.ts        # 会话持久化
-├── memory.ts         # 记忆系统
-├── event-stream.ts   # Push 异步事件流
-├── types.ts          # 核心类型
-└── index.ts          # 公共 API 导出
+├── cli.ts            # CLI entry, arg parsing
+├── repl.ts           # interactive REPL
+├── agent.ts          # agent core (state, events, queues)
+├── agent-loop.ts     # execution engine
+├── provider.ts       # LLM provider abstraction
+├── tools.ts          # built-in tools
+├── config.ts         # config management + model catalog
+├── session.ts        # session persistence
+├── memory.ts         # memory system
+├── event-stream.ts   # push-based async event stream
+├── types.ts          # core types
+└── index.ts          # public API exports
 ```
 
-### 执行流程
+### Execution flow
 
 ```
 User Input → REPL → Agent.prompt()
@@ -238,38 +240,38 @@ User Input → REPL → Agent.prompt()
 
 ---
 
-## 🧪 开发 Development
+## 🧪 Development
 
 ```bash
-npm run dev       # 开发模式（热重载）
-npm run build     # 构建
-npm run debug     # 调试模式
+npm run dev       # dev mode (hot reload)
+npm run build     # build
+npm run debug     # debug mode
 ```
 
-### 冒烟测试 Smoke Tests
+### Smoke tests
 
 ```bash
-node --import tsx scripts/smoke-session.ts   # 会话持久化 API
-node --import tsx scripts/smoke-resume.ts    # 保存 → 恢复 round-trip
-node --import tsx scripts/smoke-stream.ts    # 流式渲染（装饰只出现一次）
+node --import tsx scripts/smoke-session.ts   # session persistence API
+node --import tsx scripts/smoke-resume.ts    # save → resume round-trip
+node --import tsx scripts/smoke-stream.ts    # streaming render (decorations once)
 ```
 
 ---
 
-## 🗺 Roadmap 规划
+## 🗺 Roadmap
 
-### ✅ 已完成
+### ✅ Done
 
-- [x] Layer 1: 显式记忆命令（`/remember` `/recall` `/forget` `/memories`）
-- [x] Layer 2: 记忆自动注入系统提示词
-- [x] Layer 3: 会话持久化（自动保存 / `-s` 恢复 / 会话列表与命名）
+- [x] Layer 1: explicit memory commands (`/remember` `/recall` `/forget` `/memories`)
+- [x] Layer 2: auto-inject memory into the system prompt
+- [x] Layer 3: session persistence (auto-save / `-s` resume / list & alias)
 
-### 🚧 规划中
+### 🚧 Planned
 
-- [ ] **Layer 4: 自动事实提取** — 每轮对话后让 LLM 提取重要事实并自动保存、去重更新
+- [ ] **Layer 4: auto fact extraction** — after each turn, ask the LLM to extract key facts, save & dedupe them automatically
 
 ---
 
-## 📄 License 许可
+## 📄 License
 
-[MIT](LICENSE) — 可自由使用、修改和分发。
+[MIT](LICENSE) — free to use, modify, and distribute.

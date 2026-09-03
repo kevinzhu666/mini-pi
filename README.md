@@ -1,10 +1,10 @@
 > **English** | [**中文**](README.zh-CN.md)
 
-# 🤖 Mini Pi Agent
+# Mini Pi Agent
 
 **Mini Pi Agent** is a lightweight terminal AI coding assistant. Chat with LLMs right in your terminal to read files, edit code, and run commands.
 
-## ✨ Features
+## Features
 
 | Feature | Description |
 |---------|-------------|
@@ -19,7 +19,7 @@
 
 ---
 
-## 🚀 Quick Start
+## Quick Start
 
 > Prerequisites: **Node.js ≥ 18**
 
@@ -131,7 +131,7 @@ CLI flags take the highest priority, overriding both config files and env vars.
 
 ---
 
-## 🎮 REPL Commands
+## REPL Commands
 
 Type `/` in the REPL (`/help` lists them all):
 
@@ -160,7 +160,7 @@ Type `/` in the REPL (`/help` lists them all):
 
 ---
 
-## 💾 Session Persistence
+## Session Persistence
 
 Conversations auto-save to `~/.mini-pi/sessions/<id>.json` and resume across restarts:
 
@@ -176,7 +176,7 @@ One JSON file per session — user / assistant / toolResult messages (including 
 
 ---
 
-## 🧠 Memory
+## Memory
 
 - **Explicit**: store facts with `/remember key = value`, recall with `/recall`; data lives in `~/.mini-pi/memory/memory.json`.
 - **Auto-injection**: before every prompt, all stored facts are injected into the system prompt — no `/recall` needed.
@@ -201,7 +201,58 @@ One JSON file per session — user / assistant / toolResult messages (including 
 
 ---
 
-## 🏗 Architecture
+## Architecture
+
+Mini Pi is layered: the CLI picks a mode, the REPL drives an `Agent`, and the Agent loop is the engine that streams from a provider and executes tools.
+
+### Component layers
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                        CLI  (cli.ts)                        │
+│   arg parsing · mode select (interactive/one-shot/piped)   │
+│          load config & auth · apply CLI overrides          │
+└──────────────────────────────┬──────────────────────────────┘
+                              │ new MiniPiREPL(cwd, config, opts)
+                              ▼                              
+┌─────────────────────────────────────────────────────────────┐
+│                       REPL  (repl.ts)                       │
+│  readline UI · slash commands · memory → system prompt     │
+│           session persistence · streaming render           │
+└──────────────────────────────┬──────────────────────────────┘
+                              │ prompt(input)                
+                              ▼                              
+┌─────────────────────────────────────────────────────────────┐
+│                      Agent  (agent.ts)                      │
+│     state (prompt/model/tools/messages) · event system     │
+│          steering / follow-up queues · lifecycle           │
+└──────────────────────────────┬──────────────────────────────┘
+                              │ runAgentLoop                 
+                              ▼                              
+┌─────────────────────────────────────────────────────────────┐
+│         Agent Loop  (agent-loop.ts)  — the engine          │
+│ convertToLlm → stream LLM → run tool calls → loop to stop  │
+└─────────────┬─────────────────────────────────┬─────────────┘
+             streamModel                       tool.execute  
+             ▼                                 ▼             
+┌───────────────────────────┐     ┌───────────────────────────┐
+│  Provider (provider.ts)   │     │     Tools  (tools.ts)     │
+│     OpenAI-compatible     │     │   read / write / edit /   │
+│    registerProvider()     │     │    bash / glob / grep     │
+└─────────────┬─────────────┘     └─────────────┬─────────────┘
+             │ HTTP                            │ FS          
+             ▼                                 ▼             
+┌─────────────────────────────────────────────────────────────┐
+│    LLM API (OpenAI-compatible)   ·   project filesystem    │
+└─────────────────────────────────────────────────────────────┘
+```
+
+Cross-cutting modules:
+  config.ts  (config + model catalog)    session.ts  (persistence)
+  memory.ts  (facts + auto-inject)       event-stream.ts  (async stream)
+  types.ts   (core types)                index.ts     (public API)
+
+### Source layout
 
 ```
 src/
@@ -219,28 +270,63 @@ src/
 └── index.ts          # public API exports
 ```
 
-### Execution flow
+### Conversation flow
+
+What actually happens when you use mini-pi, from launch to exit:
 
 ```
-User Input → REPL → Agent.prompt()
-                       ↓
-                Agent Loop
-                       ↓
-            ┌─── LLM Stream ───┐
-            │                   │
-            ▼                   ▼
-         Has Tool Call?      Done
-            │                   │
-            ▼                   ▼
-        Execute Tool         Return
-            │
-            ▼
-        Inject Result → Continue Loop
+┌─────────────────────────────────────┐
+│         You launch mini-pi          │
+└─────────────────────────────────────┘
+                  │
+                  ▼
+┌─────────────────────────────────────┐
+│         It loads your setup         │
+│   (which AI model, where to save)   │
+└─────────────────────────────────────┘
+                  │
+                  ▼
+┌─────────────────────────────────────┐
+│         You type a message          │
+│   (a question, or "fix this bug")   │
+└─────────────────────────────────────┘
+                  │
+                  ▼
+┌─────────────────────────────────────┐
+│     Your message goes to the AI     │
+└─────────────────────────────────────┘
+                  │
+                  ▼
+┌─────────────────────────────────────┐
+│      The AI decides what to do      │
+│                                     │
+│       · answer you directly        │
+│   · or work first — read files,   │
+│  edit code, run a command, search —│
+│       until it's ready to reply     │
+└─────────────────────────────────────┘
+                  │
+                  ▼
+┌─────────────────────────────────────┐
+│ The answer streams in word by word  │
+│   (you can interrupt it anytime)    │
+└─────────────────────────────────────┘
+                  │
+                  ▼
+┌─────────────────────────────────────┐
+│     Your conversation is saved      │
+└─────────────────────────────────────┘
+                  │
+                  ▼
+┌─────────────────────────────────────┐
+│         Type /exit to quit          │
+│   (or come back later and resume)   │
+└─────────────────────────────────────┘
 ```
 
 ---
 
-## 🧪 Development
+## Development
 
 ```bash
 npm run dev       # dev mode (hot reload)
@@ -258,20 +344,29 @@ node --import tsx scripts/smoke-stream.ts    # streaming render (decorations onc
 
 ---
 
-## 🗺 Roadmap
+## Roadmap
 
-### ✅ Done
+### Done
 
-- [x] Layer 1: explicit memory commands (`/remember` `/recall` `/forget` `/memories`)
-- [x] Layer 2: auto-inject memory into the system prompt
-- [x] Layer 3: session persistence (auto-save / `-s` resume / list & alias)
+- [x] **Core engine** — Agent + Agent Loop + push event stream
+- [x] **REPL** — interactive / one-shot / piped input modes
+- [x] **6 built-in tools** — read / write / edit / bash / glob / grep
+- [x] **Steering & hooks** — `steer()` / `followUp()` mid-turn queues + `before`/`after` toolCall hooks
+- [x] **Explicit memory** — `/remember` `/recall` `/forget` `/memories`
+- [x] **Memory auto-injection** — stored facts injected into the system prompt each turn
+- [x] **Session persistence** — auto-save / `-s` resume / list & alias
+- [x] **Config & CLI** — multi-provider (OpenAI-compatible) · `-c`/`--config` · `-l`/`--list-models` · `baseUrl`/`api-key` overrides
 
-### 🚧 Planned
+### Planned
 
-- [ ] **Layer 4: auto fact extraction** — after each turn, ask the LLM to extract key facts, save & dedupe them automatically
+- [ ] **Auto fact extraction** — after each turn, ask the LLM to extract key facts, save & dedupe them automatically
+- [ ] **`transformContext` pipeline** — a single context-transform entry point (history trimming, RAG, long-term memory)
+- [ ] **Context compaction** — auto-summarize long sessions to stay under the context window
+- [ ] **Skills & prompt templates** — `/skill:name` and `.md` templates
+- [ ] **Extension system · session tree/fork · multi-protocol providers · TUI**
 
 ---
 
-## 📄 License
+## License
 
 [MIT](LICENSE) — free to use, modify, and distribute.

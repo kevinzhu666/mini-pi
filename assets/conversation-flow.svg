@@ -1,0 +1,66 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 850" width="960" height="850">
+  <style>
+    text { font-family: 'Helvetica Neue', Helvetica, Arial, 'PingFang SC', 'Microsoft YaHei', 'Microsoft JhengHei', 'SimHei', sans-serif; }
+  </style>
+  <defs>
+    <marker id="arrow" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#2563eb"/>
+    </marker>
+  </defs>
+  <rect width="960" height="850" fill="#ffffff" data-graph-role="background"/>
+  <text x="480" y="34" text-anchor="middle" fill="#111827" font-size="18" font-weight="600" data-graph-role="label">Mini Pi — Conversation Flow</text>
+  <g data-graph-role="node">
+    <rect x="220" y="58" width="520" height="68" rx="8" ry="8" fill="#ffffff" stroke="#d1d5db" stroke-width="1.5"/>
+    <rect x="222" y="60" width="5" height="64" rx="2.5" fill="#2563eb"/>
+    <text x="480.0" y="84" text-anchor="middle" fill="#111827" font-size="14.5" font-weight="600">You launch mini-pi</text>
+  </g>
+  <g data-graph-role="node">
+    <rect x="220" y="152" width="520" height="68" rx="8" ry="8" fill="#ffffff" stroke="#d1d5db" stroke-width="1.5"/>
+    <rect x="222" y="154" width="5" height="64" rx="2.5" fill="#2563eb"/>
+    <text x="480.0" y="178" text-anchor="middle" fill="#111827" font-size="14.5" font-weight="600">It loads your setup</text>
+    <text x="480.0" y="198" text-anchor="middle" fill="#6b7280" font-size="12.5">(which AI model, where to save)</text>
+  </g>
+  <g data-graph-role="node">
+    <rect x="220" y="246" width="520" height="68" rx="8" ry="8" fill="#ffffff" stroke="#d1d5db" stroke-width="1.5"/>
+    <rect x="222" y="248" width="5" height="64" rx="2.5" fill="#2563eb"/>
+    <text x="480.0" y="272" text-anchor="middle" fill="#111827" font-size="14.5" font-weight="600">You type a message</text>
+    <text x="480.0" y="292" text-anchor="middle" fill="#6b7280" font-size="12.5">(a question, or “fix this bug”)</text>
+  </g>
+  <g data-graph-role="node">
+    <rect x="220" y="340" width="520" height="68" rx="8" ry="8" fill="#ffffff" stroke="#d1d5db" stroke-width="1.5"/>
+    <rect x="222" y="342" width="5" height="64" rx="2.5" fill="#2563eb"/>
+    <text x="480.0" y="366" text-anchor="middle" fill="#111827" font-size="14.5" font-weight="600">Your message goes to the AI</text>
+  </g>
+  <g data-graph-role="node">
+    <rect x="220" y="434" width="520" height="104" rx="8" ry="8" fill="#ffffff" stroke="#d1d5db" stroke-width="1.5"/>
+    <rect x="222" y="436" width="5" height="100" rx="2.5" fill="#2563eb"/>
+    <text x="480.0" y="460" text-anchor="middle" fill="#111827" font-size="14.5" font-weight="600">The AI decides what to do</text>
+    <text x="480.0" y="480" text-anchor="middle" fill="#6b7280" font-size="12.5">· answer you directly</text>
+    <text x="480.0" y="500" text-anchor="middle" fill="#6b7280" font-size="12.5">· or work first — read files, edit code, run a command, search</text>
+    <text x="480.0" y="520" text-anchor="middle" fill="#6b7280" font-size="12.5">· until it’s ready to reply</text>
+  </g>
+  <g data-graph-role="node">
+    <rect x="220" y="564" width="520" height="68" rx="8" ry="8" fill="#ffffff" stroke="#d1d5db" stroke-width="1.5"/>
+    <rect x="222" y="566" width="5" height="64" rx="2.5" fill="#2563eb"/>
+    <text x="480.0" y="590" text-anchor="middle" fill="#111827" font-size="14.5" font-weight="600">The answer streams in word by word</text>
+    <text x="480.0" y="610" text-anchor="middle" fill="#6b7280" font-size="12.5">(you can interrupt it anytime)</text>
+  </g>
+  <g data-graph-role="node">
+    <rect x="220" y="658" width="520" height="68" rx="8" ry="8" fill="#ffffff" stroke="#d1d5db" stroke-width="1.5"/>
+    <rect x="222" y="660" width="5" height="64" rx="2.5" fill="#2563eb"/>
+    <text x="480.0" y="684" text-anchor="middle" fill="#111827" font-size="14.5" font-weight="600">Your conversation is saved</text>
+  </g>
+  <g data-graph-role="node">
+    <rect x="220" y="752" width="520" height="68" rx="8" ry="8" fill="#ffffff" stroke="#d1d5db" stroke-width="1.5"/>
+    <rect x="222" y="754" width="5" height="64" rx="2.5" fill="#2563eb"/>
+    <text x="480.0" y="778" text-anchor="middle" fill="#111827" font-size="14.5" font-weight="600">Type /exit to quit</text>
+    <text x="480.0" y="798" text-anchor="middle" fill="#6b7280" font-size="12.5">(or come back later and resume)</text>
+  </g>
+  <line x1="480" y1="126" x2="480" y2="152" stroke="#2563eb" stroke-width="2" marker-end="url(#arrow)"/>
+  <line x1="480" y1="220" x2="480" y2="246" stroke="#2563eb" stroke-width="2" marker-end="url(#arrow)"/>
+  <line x1="480" y1="314" x2="480" y2="340" stroke="#2563eb" stroke-width="2" marker-end="url(#arrow)"/>
+  <line x1="480" y1="408" x2="480" y2="434" stroke="#2563eb" stroke-width="2" marker-end="url(#arrow)"/>
+  <line x1="480" y1="538" x2="480" y2="564" stroke="#2563eb" stroke-width="2" marker-end="url(#arrow)"/>
+  <line x1="480" y1="632" x2="480" y2="658" stroke="#2563eb" stroke-width="2" marker-end="url(#arrow)"/>
+  <line x1="480" y1="726" x2="480" y2="752" stroke="#2563eb" stroke-width="2" marker-end="url(#arrow)"/>
+</svg>
